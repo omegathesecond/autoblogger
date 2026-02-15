@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Blog {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String
+  content     String
+  excerpt     String?
+  company     String   // eneza, yebolearn, yebojobs, etc.
+  category    String?
+  tags        String[] @default([])
+  status      BlogStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // AI generation metadata
+  prompt      String?
+  model       String?
+  
+  // Push tracking
+  pushedAt    DateTime?
+  pushError   String?
+  
+  @@unique([company, slug])
+  @@index([company])
+  @@index([status])
+}
+
+model BlogSchedule {
+  id          String   @id @default(uuid())
+  company     String
+  category    String?
+  cronExpr    String   // e.g., "0 9 * * 1" (Mondays 9am)
+  prompt      String   // Base prompt for generation
+  enabled     Boolean  @default(true)
+  lastRun     DateTime?
+  nextRun     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([company])
+  @@index([enabled])
+}
+
+enum BlogStatus {
+  DRAFT
+  GENERATED
+  PUBLISHED
+  FAILED
+}

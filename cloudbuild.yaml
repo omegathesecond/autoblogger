@@ -1,0 +1,52 @@
+steps:
+  - name: 'node:22'
+    entrypoint: 'npm'
+    args: ['ci']
+
+  - name: 'node:22'
+    entrypoint: 'npx'
+    args: ['prisma', 'generate']
+
+  - name: 'node:22'
+    entrypoint: 'npm'
+    args: ['run', 'build']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/autoblogger:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/autoblogger:latest'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/autoblogger:$COMMIT_SHA']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/autoblogger:latest']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'autoblogger'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/autoblogger:$COMMIT_SHA'
+      - '--region'
+      - 'europe-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-secrets'
+      - 'DATABASE_URL=AUTOBLOGGER_DB_URL:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,INTERNAL_API_KEY=OMEVISION_INTERNAL_KEY:latest,JOB_SECRET=OMEVISION_JOB_SECRET:latest,ENEZA_BLOG_API_KEY=OMEVISION_ENEZA_BLOG_KEY:latest'
+      - '--set-env-vars'
+      - 'NODE_ENV=production'
+
+images:
+  - 'gcr.io/$PROJECT_ID/autoblogger:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/autoblogger:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
