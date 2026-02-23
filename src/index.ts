@@ -170,6 +170,60 @@ app.get('/api/blogs/:id', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/blogs/auto-publish - Auto-publish all GENERATED posts to their target products
+app.post('/api/blogs/auto-publish', authenticate, async (req, res) => {
+  try {
+    const generatedBlogs = await prisma.blog.findMany({
+      where: { status: BlogStatus.GENERATED }
+    });
+
+    const results = [];
+
+    for (const blog of generatedBlogs) {
+      try {
+        const targetUrl = getProductBlogUrl(blog.company);
+        const apiKey = getProductApiKey(blog.company);
+
+        if (!targetUrl || !apiKey) {
+          results.push({ id: blog.id, company: blog.company, success: false, error: `No endpoint for ${blog.company}` });
+          continue;
+        }
+
+        const response = await fetch(targetUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+          body: JSON.stringify({
+            title: blog.title, slug: blog.slug, content: blog.content,
+            excerpt: blog.excerpt, category: blog.category, tags: blog.tags
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(error);
+        }
+
+        await prisma.blog.update({
+          where: { id: blog.id },
+          data: { status: BlogStatus.PUBLISHED, publishedAt: new Date(), pushedAt: new Date(), pushError: null }
+        });
+
+        results.push({ id: blog.id, company: blog.company, success: true });
+      } catch (error: any) {
+        await prisma.blog.update({
+          where: { id: blog.id },
+          data: { status: BlogStatus.FAILED, pushError: error.message }
+        });
+        results.push({ id: blog.id, company: blog.company, success: false, error: error.message });
+      }
+    }
+
+    res.json({ success: true, published: results.filter(r => r.success).length, failed: results.filter(r => !r.success).length, results });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST /api/blogs/:id/publish - Publish blog to target product
 app.post('/api/blogs/:id/publish', authenticate, async (req, res) => {
   try {
