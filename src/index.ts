@@ -334,9 +334,13 @@ app.post('/api/schedules/run', authenticate, async (req, res) => {
 function getProductBlogUrl(company: string): string | null {
   const urls: Record<string, string> = {
     eneza: process.env.ENEZA_BLOG_URL || 'https://api.eneza.app/api/blog/posts',
+    yebojobs: process.env.YEBOJOBS_BLOG_URL || 'https://api.yebojobs.com/blog/posts',
+    vavu: process.env.VAVU_BLOG_URL || 'https://api.vavu.app/api/blog/posts',
+    yebona: process.env.YEBONA_BLOG_URL || 'https://api.yebona.com/api/blog/posts',
+    bamzu: process.env.BAMZU_BLOG_URL || 'https://api.bamzu.app/api/blog/posts',
+    yebolink: process.env.YEBOLINK_BLOG_URL || 'https://api.yebolink.com/api/blog/posts',
+    // YeboLearn backend not found - skip for now
     yebolearn: process.env.YEBOLEARN_BLOG_URL || '',
-    yebojobs: process.env.YEBOJOBS_BLOG_URL || '',
-    // Add more products as needed
   };
   return urls[company.toLowerCase()] || null;
 }
@@ -345,8 +349,13 @@ function getProductBlogUrl(company: string): string | null {
 function getProductApiKey(company: string): string | null {
   const keys: Record<string, string | undefined> = {
     eneza: process.env.ENEZA_BLOG_API_KEY,
-    yebolearn: process.env.YEBOLEARN_BLOG_API_KEY,
     yebojobs: process.env.YEBOJOBS_BLOG_API_KEY,
+    vavu: process.env.VAVU_BLOG_API_KEY,
+    yebona: process.env.YEBONA_BLOG_API_KEY,
+    bamzu: process.env.BAMZU_BLOG_API_KEY,
+    yebolink: process.env.YEBOLINK_BLOG_API_KEY,
+    // YeboLearn backend not found - skip for now  
+    yebolearn: process.env.YEBOLEARN_BLOG_API_KEY,
   };
   return keys[company.toLowerCase()] || null;
 }
