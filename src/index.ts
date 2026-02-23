@@ -18,6 +18,114 @@ const genAI = process.env.GEMINI_API_KEY
 app.use(cors());
 app.use(express.json());
 
+const SEO_MATRIX: Record<string, { keywords: string[], countries: string[] }> = {
+  eneza: {
+    keywords: [
+      'best education apps', 'online learning platform', 'e-learning for schools',
+      'student learning app', 'education technology', 'mobile learning platform',
+      'digital classroom', 'online tutoring platform', 'school management system',
+      'exam preparation app', 'homework help app', 'interactive learning',
+      'STEM education app', 'affordable education platform', 'distance learning'
+    ],
+    countries: ['Kenya', 'Eswatini', 'South Africa', 'Nigeria', 'Tanzania', 'Uganda', 'Ghana', 'Rwanda', 'Ethiopia', 'Zambia']
+  },
+  yebojobs: {
+    keywords: [
+      'job search sites', 'find jobs online', 'employment platform', 'career opportunities',
+      'job vacancies', 'recruitment platform', 'hire employees', 'job board',
+      'remote jobs', 'part time jobs', 'internship opportunities', 'graduate jobs',
+      'tech jobs', 'entry level jobs', 'freelance work platform'
+    ],
+    countries: ['Kenya', 'Eswatini', 'South Africa', 'Nigeria', 'Tanzania', 'Uganda', 'Ghana', 'Rwanda', 'Ethiopia', 'Zambia']
+  },
+  vavu: {
+    keywords: [
+      'online shopping sites', 'buy and sell online', 'classifieds marketplace',
+      'second hand items', 'online marketplace', 'sell stuff online', 'buy used items',
+      'local marketplace app', 'cheap products online', 'online store',
+      'electronics for sale', 'furniture marketplace', 'fashion marketplace',
+      'deals and discounts', 'trusted online shopping'
+    ],
+    countries: ['Kenya', 'Eswatini', 'South Africa', 'Nigeria', 'Tanzania', 'Uganda', 'Ghana', 'Rwanda', 'Zambia', 'Mozambique']
+  },
+  bamzu: {
+    keywords: [
+      'buy cars online', 'used cars for sale', 'car marketplace', 'affordable cars',
+      'sell my car', 'car dealership online', 'second hand cars', 'car prices',
+      'best cars to buy', 'car financing', 'import cars', 'car reviews',
+      'SUV for sale', 'cheap cars', 'certified used cars'
+    ],
+    countries: ['Kenya', 'Eswatini', 'South Africa', 'Nigeria', 'Tanzania', 'Uganda', 'Ghana', 'Rwanda', 'Zambia', 'Botswana']
+  },
+  yebona: {
+    keywords: [
+      'import from China to Africa', 'China sourcing agent', 'trade services Africa',
+      'shipping from China', 'wholesale from China', 'factory verification China',
+      'currency exchange Africa China', 'freight forwarding Africa', 'customs clearing',
+      'buy from Alibaba', 'China trade consultant', 'import export business',
+      'dropshipping from China', 'product sourcing', 'trade finance Africa'
+    ],
+    countries: ['Kenya', 'Nigeria', 'South Africa', 'Tanzania', 'Ghana', 'Uganda', 'Ethiopia', 'Zambia', 'Mozambique', 'Rwanda']
+  },
+  yebolink: {
+    keywords: [
+      'SMS API', 'bulk messaging platform', 'WhatsApp business API',
+      'communication API', 'send SMS online', 'business messaging',
+      'OTP verification service', 'transactional SMS', 'marketing SMS platform',
+      'two way messaging', 'SMS gateway', 'notification service',
+      'email API', 'voice API', 'omnichannel messaging'
+    ],
+    countries: ['Kenya', 'Eswatini', 'South Africa', 'Nigeria', 'Tanzania', 'Uganda', 'Ghana', 'Rwanda', 'Ethiopia', 'Zambia']
+  }
+};
+
+async function pickNextKeywords(company: string, count: number = 3): Promise<{keyword: string, country: string}[]> {
+  const matrix = SEO_MATRIX[company];
+  if (!matrix) return [];
+
+  const existing = await prisma.blog.findMany({
+    where: { company },
+    select: { targetKeyword: true, targetCountry: true }
+  });
+  const usedCombos = new Set(existing.map(e => `${e.targetKeyword}||${e.targetCountry}`));
+
+  const allCombos: {keyword: string, country: string}[] = [];
+  for (const keyword of matrix.keywords) {
+    for (const country of matrix.countries) {
+      if (!usedCombos.has(`${keyword}||${country}`)) {
+        allCombos.push({ keyword, country });
+      }
+    }
+  }
+
+  for (let i = allCombos.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allCombos[i], allCombos[j]] = [allCombos[j], allCombos[i]];
+  }
+
+  return allCombos.slice(0, count);
+}
+
+async function generateBlogImage(title: string, company: string): Promise<string | null> {
+  if (!genAI) return null;
+  
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    
+    const imagePromptResult = await model.generateContent([
+      { text: `Create a short, vivid image description (1-2 sentences) for a blog featured image about: "${title}" for ${company}. The image should be professional, modern, and relevant to African tech/business. Return ONLY the image description, nothing else.` }
+    ]);
+    
+    const imagePrompt = imagePromptResult.response.text().trim();
+    console.log(`Image prompt: ${imagePrompt}`);
+    
+    return imagePrompt;
+  } catch (err) {
+    console.error('Image prompt generation failed:', err);
+    return null;
+  }
+}
+
 // Auth middleware
 const authenticate = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
@@ -49,7 +157,7 @@ async function generateBlogContent(prompt: string, company: string, category?: s
     throw new Error('Gemini API not configured');
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' });
   
   const systemPrompt = `You are a professional blog writer for ${company}, an African tech company.
 Write engaging, informative blog posts that are:
@@ -116,7 +224,7 @@ app.post('/api/blogs/generate', authenticate, async (req, res) => {
         tags: generated.tags,
         status: BlogStatus.GENERATED,
         prompt,
-        model: 'gemini-2.0-flash'
+        model: 'gemini-2.5-flash'
       }
     });
 
@@ -290,6 +398,164 @@ app.post('/api/blogs/:id/publish', authenticate, async (req, res) => {
   }
 });
 
+// POST /api/blogs/generate-seo - Generate SEO-targeted posts for a company
+app.post('/api/blogs/generate-seo', authenticate, async (req, res) => {
+  try {
+    const { company, count = 3 } = req.body;
+    
+    if (!company) {
+      return res.status(400).json({ error: 'company is required' });
+    }
+    
+    const targets = await pickNextKeywords(company, count);
+    
+    if (targets.length === 0) {
+      return res.json({ success: true, message: 'All keyword combinations covered!', blogs: [] });
+    }
+    
+    const results = [];
+    
+    for (const target of targets) {
+      try {
+        const seoPrompt = `Write a comprehensive, SEO-optimized blog post targeting the keyword "${target.keyword} in ${target.country}".
+
+Requirements:
+- Title MUST contain "${target.keyword} in ${target.country}" or a close variant
+- Use the keyword naturally 3-5 times in the content
+- Include local context specific to ${target.country}
+- Mention ${company} as a solution (naturally, not forced)
+- Include actionable tips or information
+- Target 800-1200 words
+- Include a compelling meta description
+- Use headers (H2, H3) for structure`;
+
+        const generated = await generateBlogContent(seoPrompt, company, 'seo');
+        const slug = generateSlug(generated.title);
+        const imagePrompt = await generateBlogImage(generated.title, company);
+
+        const blog = await prisma.blog.create({
+          data: {
+            title: generated.title,
+            slug,
+            content: generated.content,
+            excerpt: generated.excerpt,
+            company,
+            category: 'seo',
+            tags: [...generated.tags, target.country.toLowerCase(), target.keyword.split(' ')[0]],
+            status: BlogStatus.GENERATED,
+            prompt: seoPrompt,
+            model: 'gemini-2.5-flash',
+            targetKeyword: target.keyword,
+            targetCountry: target.country,
+          }
+        });
+
+        results.push({ id: blog.id, keyword: target.keyword, country: target.country, title: blog.title, success: true });
+      } catch (err: any) {
+        results.push({ keyword: target.keyword, country: target.country, success: false, error: err.message });
+      }
+    }
+    
+    res.json({ success: true, generated: results.filter(r => r.success).length, failed: results.filter(r => !r.success).length, results });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/blogs/generate-all-seo - Generate SEO posts for ALL companies
+app.post('/api/blogs/generate-all-seo', authenticate, async (req, res) => {
+  try {
+    const { postsPerCompany = 3 } = req.body;
+    const companies = Object.keys(SEO_MATRIX);
+    const allResults: any[] = [];
+
+    for (const company of companies) {
+      const targets = await pickNextKeywords(company, postsPerCompany);
+      
+      for (const target of targets) {
+        try {
+          const seoPrompt = `Write a comprehensive, SEO-optimized blog post targeting the keyword "${target.keyword} in ${target.country}".
+
+Requirements:
+- Title MUST contain "${target.keyword} in ${target.country}" or a close variant
+- Use the keyword naturally 3-5 times in the content
+- Include local context specific to ${target.country}
+- Mention ${company} as a solution (naturally, not forced)
+- Include actionable tips or information
+- Target 800-1200 words
+- Include a compelling meta description
+- Use headers (H2, H3) for structure`;
+
+          const generated = await generateBlogContent(seoPrompt, company, 'seo');
+          const slug = generateSlug(generated.title);
+
+          const blog = await prisma.blog.create({
+            data: {
+              title: generated.title,
+              slug,
+              content: generated.content,
+              excerpt: generated.excerpt,
+              company,
+              category: 'seo',
+              tags: [...generated.tags, target.country.toLowerCase(), target.keyword.split(' ')[0]],
+              status: BlogStatus.GENERATED,
+              prompt: seoPrompt,
+              model: 'gemini-2.5-flash',
+              targetKeyword: target.keyword,
+              targetCountry: target.country,
+            }
+          });
+
+          allResults.push({ id: blog.id, company, keyword: target.keyword, country: target.country, title: blog.title, success: true });
+        } catch (err: any) {
+          allResults.push({ company, keyword: target.keyword, country: target.country, success: false, error: err.message });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      total: allResults.length,
+      generated: allResults.filter(r => r.success).length,
+      failed: allResults.filter(r => !r.success).length,
+      results: allResults
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/blogs/seo-coverage - Show keyword coverage stats
+app.get('/api/blogs/seo-coverage', authenticate, async (req, res) => {
+  try {
+    const coverage: any = {};
+    
+    for (const [company, matrix] of Object.entries(SEO_MATRIX)) {
+      const existing = await prisma.blog.findMany({
+        where: { company },
+        select: { targetKeyword: true, targetCountry: true }
+      });
+      const usedCombos = new Set(existing.map(e => `${e.targetKeyword}||${e.targetCountry}`));
+      
+      const totalCombos = matrix.keywords.length * matrix.countries.length;
+      const covered = existing.filter(e => e.targetKeyword && e.targetCountry).length;
+      
+      coverage[company] = {
+        totalKeywords: matrix.keywords.length,
+        totalCountries: matrix.countries.length,
+        totalCombinations: totalCombos,
+        covered,
+        remaining: totalCombos - covered,
+        percentComplete: Math.round((covered / totalCombos) * 100)
+      };
+    }
+    
+    res.json({ success: true, coverage });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // DELETE /api/blogs/:id - Delete blog
 app.delete('/api/blogs/:id', authenticate, async (req, res) => {
   try {
@@ -365,7 +631,7 @@ app.post('/api/schedules/run', authenticate, async (req, res) => {
             tags: generated.tags,
             status: BlogStatus.GENERATED,
             prompt: schedule.prompt,
-            model: 'gemini-2.0-flash'
+            model: 'gemini-2.5-flash'
           }
         });
 

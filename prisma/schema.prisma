@@ -25,6 +25,11 @@ model Blog {
   prompt      String?
   model       String?
   
+  // SEO targeting
+  targetKeyword String?
+  targetCountry String?
+  imageUrl      String?
+  
   // Push tracking
   pushedAt    DateTime?
   pushError   String?
