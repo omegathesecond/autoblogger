@@ -127,8 +127,8 @@ app.post('/api/blogs/generate', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/blogs - List blogs
-app.get('/api/blogs', authenticate, async (req, res) => {
+// GET /api/blogs - List blogs (public - read-only)
+app.get('/api/blogs', async (req, res) => {
   try {
     const company = req.query.company as string | undefined;
     const status = req.query.status as BlogStatus | undefined;
@@ -153,8 +153,8 @@ app.get('/api/blogs', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/blogs/:id - Get single blog
-app.get('/api/blogs/:id', authenticate, async (req, res) => {
+// GET /api/blogs/:id - Get single blog (public - read-only)
+app.get('/api/blogs/:id', async (req, res) => {
   try {
     const blog = await prisma.blog.findUnique({
       where: { id: req.params.id as string }
