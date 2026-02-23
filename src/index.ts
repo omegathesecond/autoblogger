@@ -132,13 +132,15 @@ app.get('/api/blogs', authenticate, async (req, res) => {
   try {
     const company = req.query.company as string | undefined;
     const status = req.query.status as BlogStatus | undefined;
+    const slug = req.query.slug as string | undefined;
     const limit = parseInt(req.query.limit as string || '20');
     const offset = parseInt(req.query.offset as string || '0');
 
     const blogs = await prisma.blog.findMany({
       where: {
         ...(company && { company }),
-        ...(status && { status })
+        ...(status && { status }),
+        ...(slug && { slug })
       },
       orderBy: { createdAt: 'desc' },
       take: limit,
