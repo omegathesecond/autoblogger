@@ -157,7 +157,7 @@ async function generateBlogContent(prompt: string, company: string, category?: s
     throw new Error('Gemini API not configured');
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   
   const systemPrompt = `You are a professional blog writer for ${company}, an African tech company.
 Write engaging, informative blog posts that are:
@@ -256,6 +256,37 @@ app.get('/api/blogs', async (req, res) => {
     });
 
     res.json({ success: true, blogs });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/blogs/seo-coverage - Show keyword coverage stats
+app.get('/api/blogs/seo-coverage', authenticate, async (req, res) => {
+  try {
+    const coverage: any = {};
+    
+    for (const [company, matrix] of Object.entries(SEO_MATRIX)) {
+      const existing = await prisma.blog.findMany({
+        where: { company },
+        select: { targetKeyword: true, targetCountry: true }
+      });
+      const usedCombos = new Set(existing.map(e => `${e.targetKeyword}||${e.targetCountry}`));
+      
+      const totalCombos = matrix.keywords.length * matrix.countries.length;
+      const covered = existing.filter(e => e.targetKeyword && e.targetCountry).length;
+      
+      coverage[company] = {
+        totalKeywords: matrix.keywords.length,
+        totalCountries: matrix.countries.length,
+        totalCombinations: totalCombos,
+        covered,
+        remaining: totalCombos - covered,
+        percentComplete: Math.round((covered / totalCombos) * 100)
+      };
+    }
+    
+    res.json({ success: true, coverage });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -520,37 +551,6 @@ Requirements:
       failed: allResults.filter(r => !r.success).length,
       results: allResults
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// GET /api/blogs/seo-coverage - Show keyword coverage stats
-app.get('/api/blogs/seo-coverage', authenticate, async (req, res) => {
-  try {
-    const coverage: any = {};
-    
-    for (const [company, matrix] of Object.entries(SEO_MATRIX)) {
-      const existing = await prisma.blog.findMany({
-        where: { company },
-        select: { targetKeyword: true, targetCountry: true }
-      });
-      const usedCombos = new Set(existing.map(e => `${e.targetKeyword}||${e.targetCountry}`));
-      
-      const totalCombos = matrix.keywords.length * matrix.countries.length;
-      const covered = existing.filter(e => e.targetKeyword && e.targetCountry).length;
-      
-      coverage[company] = {
-        totalKeywords: matrix.keywords.length,
-        totalCountries: matrix.countries.length,
-        totalCombinations: totalCombos,
-        covered,
-        remaining: totalCombos - covered,
-        percentComplete: Math.round((covered / totalCombos) * 100)
-      };
-    }
-    
-    res.json({ success: true, coverage });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
