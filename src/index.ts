@@ -21,11 +21,11 @@ app.use(express.json());
 const SEO_MATRIX: Record<string, { keywords: string[], countries: string[] }> = {
   eneza: {
     keywords: [
-      'best education apps', 'online learning platform', 'e-learning for schools',
-      'student learning app', 'education technology', 'mobile learning platform',
-      'digital classroom', 'online tutoring platform', 'school management system',
-      'exam preparation app', 'homework help app', 'interactive learning',
-      'STEM education app', 'affordable education platform', 'distance learning'
+      'WhatsApp status ads', 'WhatsApp advertising platform', 'advertise on WhatsApp',
+      'WhatsApp marketing', 'WhatsApp status marketing', 'social media advertising',
+      'mobile advertising platform', 'WhatsApp ads for business', 'digital advertising Africa',
+      'cheap advertising platform', 'targeted mobile ads', 'WhatsApp promotions',
+      'small business advertising', 'local business marketing', 'affordable digital ads'
     ],
     countries: ['Kenya', 'Eswatini', 'South Africa', 'Nigeria', 'Tanzania', 'Uganda', 'Ghana', 'Rwanda', 'Ethiopia', 'Zambia']
   },
