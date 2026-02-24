@@ -261,6 +261,34 @@ app.get('/api/blogs', async (req, res) => {
   }
 });
 
+// GET /api/blogs/stats - Real analytics across all companies
+app.get('/api/blogs/stats', async (req, res) => {
+  try {
+    const [total, published, generated, failed, byCompany] = await Promise.all([
+      prisma.blog.count(),
+      prisma.blog.count({ where: { status: BlogStatus.PUBLISHED } }),
+      prisma.blog.count({ where: { status: BlogStatus.GENERATED } }),
+      prisma.blog.count({ where: { status: BlogStatus.FAILED } }),
+      prisma.blog.groupBy({
+        by: ['company', 'status'],
+        _count: { id: true }
+      })
+    ]);
+
+    // Build per-company stats
+    const companies: Record<string, any> = {};
+    for (const row of byCompany) {
+      if (!companies[row.company]) companies[row.company] = { total: 0, published: 0, generated: 0, failed: 0 };
+      companies[row.company].total += row._count.id;
+      companies[row.company][row.status.toLowerCase()] = row._count.id;
+    }
+
+    res.json({ success: true, stats: { total, published, generated, failed, byCompany: companies } });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/blogs/seo-coverage - Show keyword coverage stats
 app.get('/api/blogs/seo-coverage', authenticate, async (req, res) => {
   try {
@@ -655,14 +683,14 @@ app.post('/api/schedules/run', authenticate, async (req, res) => {
 // Helper: Get product blog API URL
 function getProductBlogUrl(company: string): string | null {
   const urls: Record<string, string> = {
-    eneza: process.env.ENEZA_BLOG_URL || 'https://api.eneza.app/api/blog/posts',
-    yebojobs: process.env.YEBOJOBS_BLOG_URL || 'https://api.yebojobs.com/blog/posts',
-    vavu: process.env.VAVU_BLOG_URL || 'https://api.vavu.app/api/blog/posts',
-    yebona: process.env.YEBONA_BLOG_URL || 'https://api.yebona.com/api/blog/posts',
-    bamzu: process.env.BAMZU_BLOG_URL || 'https://api.bamzu.app/api/blog/posts',
-    yebolink: process.env.YEBOLINK_BLOG_URL || 'https://api.yebolink.com/api/blog/posts',
-    // YeboLearn backend not found - skip for now
+    eneza: process.env.ENEZA_BLOG_URL || 'https://eneza-api-prod-1026777738823.europe-west1.run.app/api/blog/posts',
+    yebojobs: process.env.YEBOJOBS_BLOG_URL || 'https://yebojobs-api-376380527123.europe-west1.run.app/api/blog/posts',
+    vavu: process.env.VAVU_BLOG_URL || 'https://vavu-api-41980725786.europe-west1.run.app/api/blog/posts',
+    bamzu: process.env.BAMZU_BLOG_URL || 'https://bamzu-api-25158090642.europe-west1.run.app/api/blog/posts',
+    yebona: process.env.YEBONA_BLOG_URL || 'https://yebona-api-402346709223.europe-west1.run.app/api/blog/posts',
+    yebolink: process.env.YEBOLINK_BLOG_URL || 'https://yebolink-api-487987213774.europe-west1.run.app/api/blog/posts',
     yebolearn: process.env.YEBOLEARN_BLOG_URL || '',
+    yebomart: process.env.YEBOMART_BLOG_URL || 'https://yebomart-api-717538265700.europe-west1.run.app/api/blog/posts',
   };
   return urls[company.toLowerCase()] || null;
 }
@@ -676,8 +704,8 @@ function getProductApiKey(company: string): string | null {
     yebona: process.env.YEBONA_BLOG_API_KEY,
     bamzu: process.env.BAMZU_BLOG_API_KEY,
     yebolink: process.env.YEBOLINK_BLOG_API_KEY,
-    // YeboLearn backend not found - skip for now  
     yebolearn: process.env.YEBOLEARN_BLOG_API_KEY,
+    yebomart: process.env.YEBOMART_BLOG_API_KEY,
   };
   return keys[company.toLowerCase()] || null;
 }
