@@ -725,6 +725,49 @@ function getProductApiKey(company: string): string | null {
   return keys[company.toLowerCase()] || null;
 }
 
+// ── Comments (public read, public post) ────────────────────────────────────
+
+// GET /api/blogs/:slug/comments?company=eneza
+app.get('/api/blogs/:slug/comments', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const company = (req.query.company as string) || '';
+    const blog = await prisma.blog.findFirst({ where: { slug, company } });
+    if (!blog) return res.status(404).json({ error: 'Post not found' });
+    const comments = await prisma.comment.findMany({
+      where: { blogId: blog.id, approved: true },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true, body: true, createdAt: true },
+    });
+    res.json({ comments });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/blogs/:slug/comments  { name, email?, body, company }
+app.post('/api/blogs/:slug/comments', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { name, email, body, company } = req.body;
+    if (!name?.trim() || !body?.trim()) {
+      return res.status(400).json({ error: 'name and body required' });
+    }
+    if (body.trim().length < 3 || body.trim().length > 2000) {
+      return res.status(400).json({ error: 'Comment must be 3–2000 characters' });
+    }
+    const blog = await prisma.blog.findFirst({ where: { slug, company } });
+    if (!blog) return res.status(404).json({ error: 'Post not found' });
+    const comment = await prisma.comment.create({
+      data: { blogId: blog.id, name: name.trim(), email: email?.trim() || null, body: body.trim() },
+      select: { id: true, name: true, body: true, createdAt: true },
+    });
+    res.json({ success: true, comment });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Autoblogger running on port ${PORT}`);
