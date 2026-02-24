@@ -3,6 +3,7 @@ import cors from 'cors';
 import { PrismaClient, BlogStatus } from '@prisma/client';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
+import { getCompanyContext } from './companyKB';
 
 dotenv.config();
 
@@ -159,12 +160,18 @@ async function generateBlogContent(prompt: string, company: string, category?: s
 
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   
+  const companyContext = getCompanyContext(company);
+
   const systemPrompt = `You are a professional blog writer for ${company}, an African tech company.
+
+${companyContext}
+
 Write engaging, informative blog posts that are:
 - SEO optimized
 - Easy to read
 - Relevant to African audiences
 - Professional but conversational
+- Always include a CTA at the end linking to the correct website
 
 Category: ${category || 'General'}
 
@@ -476,17 +483,21 @@ app.post('/api/blogs/generate-seo', authenticate, async (req, res) => {
     
     for (const target of targets) {
       try {
-        const seoPrompt = `Write a comprehensive, SEO-optimized blog post targeting the keyword "${target.keyword} in ${target.country}".
+        const kb = getCompanyContext(company);
+        const seoPrompt = `${kb}
+
+Write a comprehensive, SEO-optimized blog post targeting the keyword "${target.keyword} in ${target.country}".
 
 Requirements:
 - Title MUST contain "${target.keyword} in ${target.country}" or a close variant
 - Use the keyword naturally 3-5 times in the content
 - Include local context specific to ${target.country}
-- Mention ${company} as a solution (naturally, not forced)
+- Mention the company above as a solution (naturally, not forced) using the correct website URL
 - Include actionable tips or information
 - Target 800-1200 words
 - Include a compelling meta description
-- Use headers (H2, H3) for structure`;
+- Use headers (H2, H3) for structure
+- End with a CTA linking to the correct company website`;
 
         const generated = await generateBlogContent(seoPrompt, company, 'seo');
         const slug = generateSlug(generated.title);
@@ -533,17 +544,21 @@ app.post('/api/blogs/generate-all-seo', authenticate, async (req, res) => {
       
       for (const target of targets) {
         try {
-          const seoPrompt = `Write a comprehensive, SEO-optimized blog post targeting the keyword "${target.keyword} in ${target.country}".
+          const kb = getCompanyContext(company);
+          const seoPrompt = `${kb}
+
+Write a comprehensive, SEO-optimized blog post targeting the keyword "${target.keyword} in ${target.country}".
 
 Requirements:
 - Title MUST contain "${target.keyword} in ${target.country}" or a close variant
 - Use the keyword naturally 3-5 times in the content
 - Include local context specific to ${target.country}
-- Mention ${company} as a solution (naturally, not forced)
+- Mention the company above as a solution (naturally, not forced) using the correct website URL
 - Include actionable tips or information
 - Target 800-1200 words
 - Include a compelling meta description
-- Use headers (H2, H3) for structure`;
+- Use headers (H2, H3) for structure
+- End with a CTA linking to the correct company website`;
 
           const generated = await generateBlogContent(seoPrompt, company, 'seo');
           const slug = generateSlug(generated.title);
