@@ -600,6 +600,27 @@ Requirements:
 });
 
 // DELETE /api/blogs/:id - Delete blog
+// PATCH /api/blogs/:id — update title, content, excerpt, category, tags, status
+app.patch('/api/blogs/:id', authenticate, async (req, res) => {
+  try {
+    const { title, content, excerpt, category, tags, status } = req.body;
+    const data: Record<string, any> = {};
+    if (title !== undefined) data.title = title;
+    if (content !== undefined) data.content = content;
+    if (excerpt !== undefined) data.excerpt = excerpt;
+    if (category !== undefined) data.category = category;
+    if (tags !== undefined) data.tags = tags;
+    if (status !== undefined) {
+      data.status = status;
+      if (status === 'PUBLISHED' && !data.publishedAt) data.publishedAt = new Date();
+    }
+    const blog = await prisma.blog.update({ where: { id: req.params.id as string }, data });
+    res.json({ success: true, blog });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete('/api/blogs/:id', authenticate, async (req, res) => {
   try {
     await prisma.blog.delete({
