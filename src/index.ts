@@ -3,7 +3,7 @@ import cors from 'cors';
 import { PrismaClient, BlogStatus } from '@prisma/client';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
-import { getCompanyContext } from './companyKB';
+import { getCompanyContext, COMPANY_KB } from './companyKB';
 
 dotenv.config();
 
@@ -528,6 +528,280 @@ Requirements:
     
     res.json({ success: true, generated: results.filter(r => r.success).length, failed: results.filter(r => !r.success).length, results });
   } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Dashboard-driven generation
+//
+// Fetches the CEO dashboard activity feed (tasks completed in the last N hours,
+// grouped by product) and, for each product that had activity, generates a
+// daily digest blog post summarising what shipped. Auto-publishes each
+// generated post to the matching product blog endpoint.
+//
+// Triggered by Cloud Scheduler at 09:00 SAST daily, but also callable manually
+// for backfill / debugging via the same endpoint.
+// ──────────────────────────────────────────────────────────────────────────────
+
+const CEO_DASHBOARD_API_URL =
+  process.env.CEO_DASHBOARD_API_URL ||
+  'https://ceo-dashboard-api-238692725328.europe-west1.run.app';
+
+// Map dashboard product names → autoblogger company keys. Most are the same,
+// but the rebrand aliases (yebocars=bamzu, yeboshops=vavu) need translation
+// because the autoblogger's company knowledge base + publish endpoints still
+// use the legacy keys.
+const PRODUCT_TO_COMPANY: Record<string, string> = {
+  eneza: 'eneza',
+  yebojobs: 'yebojobs',
+  yebolearn: 'yebolearn',
+  yebolink: 'yebolink',
+  yebomart: 'yebomart',
+  yebona: 'yebona',
+  yebocars: 'bamzu',   // rebrand: Bamzu → yebocars
+  bamzu: 'bamzu',
+  yeboshops: 'vavu',   // rebrand: Vavu → yeboshops
+  vavu: 'vavu',
+};
+
+interface DashboardActivity {
+  type: string;
+  product: string;
+  title: string;
+  description: string | null;
+  priority: string | null;
+  labels: string[];
+  taskId: string;
+  occurredAt: string;
+}
+
+async function fetchDashboardActivityByProduct(
+  sinceHours: number
+): Promise<Record<string, DashboardActivity[]>> {
+  const internalKey = process.env.CEO_DASHBOARD_INTERNAL_KEY;
+  if (!internalKey) {
+    throw new Error(
+      'CEO_DASHBOARD_INTERNAL_KEY not set — autoblogger cannot authenticate to dashboard API'
+    );
+  }
+
+  const since = new Date(Date.now() - sinceHours * 60 * 60 * 1000).toISOString();
+  const url = `${CEO_DASHBOARD_API_URL}/api/activities/by-product?since=${encodeURIComponent(since)}`;
+
+  const resp = await fetch(url, {
+    headers: { 'X-Internal-Key': internalKey },
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(
+      `Dashboard activities fetch failed (${resp.status}): ${text.slice(0, 200)}`
+    );
+  }
+
+  const data = (await resp.json()) as {
+    success: boolean;
+    products: Record<string, DashboardActivity[]>;
+  };
+  return data.products || {};
+}
+
+function buildDigestPrompt(
+  company: string,
+  activities: DashboardActivity[],
+  windowHours: number
+): string {
+  const kb = getCompanyContext(company);
+  const items = activities
+    .map((a, i) => {
+      const desc = a.description ? ` — ${a.description.slice(0, 200)}` : '';
+      return `${i + 1}. ${a.title}${desc}`;
+    })
+    .join('\n');
+
+  return `${kb}
+
+Write a "What we shipped" digest blog post for ${company}, summarising the work that was completed in the last ${windowHours} hours. Use the following internal completion log as your source material — translate it into customer-facing language. Do NOT mention internal task IDs, status values, or anything that sounds like a Jira ticket.
+
+INTERNAL COMPLETION LOG (last ${windowHours}h):
+${items}
+
+Requirements:
+- Title: a confident, customer-facing headline (NOT "Daily Digest" — make it specific to what shipped). Examples: "New ways to reach more customers on WhatsApp", "Faster onboarding for new sellers", "What's new this week".
+- Open with a 1-2 sentence overview of the theme of the work.
+- Then a list (or short prose) covering each shipped item. Group similar items together. Translate engineering language into product/user benefit language — readers don't care about implementation, they care about what's now possible.
+- 400–700 words total. Tight, scannable, useful.
+- End with a CTA linking to ${COMPANY_KB[company]?.ctaUrl || COMPANY_KB[company]?.website}.
+- If a shipped item isn't customer-facing (internal refactor, infra), summarise it as "behind-the-scenes improvements" rather than dropping it.
+- Use markdown headers (## and ###) for structure. Keep it skimmable.`;
+}
+
+// POST /api/blogs/generate-from-dashboard
+// Body: { sinceHours?: number, dryRun?: boolean, autoPublish?: boolean }
+// Defaults: sinceHours=24, dryRun=false, autoPublish=true
+// Also accepts X-Job-Secret header for cron-style invocation (no INTERNAL_API_KEY required).
+app.post('/api/blogs/generate-from-dashboard', async (req, res) => {
+  // Auth: accept either INTERNAL_API_KEY (manual ops) OR JOB_SECRET (Cloud Scheduler).
+  const apiKey =
+    (req.headers['x-api-key'] as string | undefined) ||
+    (req.headers['authorization'] as string | undefined)?.replace('Bearer ', '');
+  const jobSecret = req.headers['x-job-secret'] as string | undefined;
+
+  const apiKeyOk = !!apiKey && apiKey === process.env.INTERNAL_API_KEY;
+  const jobSecretOk = !!jobSecret && jobSecret === process.env.JOB_SECRET;
+  if (!apiKeyOk && !jobSecretOk) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const sinceHours = Number(req.body?.sinceHours) || 24;
+    const dryRun = req.body?.dryRun === true;
+    const autoPublish = req.body?.autoPublish !== false; // default true
+
+    const productsActivity = await fetchDashboardActivityByProduct(sinceHours);
+    const productKeys = Object.keys(productsActivity);
+
+    if (productKeys.length === 0) {
+      return res.json({
+        success: true,
+        message: `No activity in the last ${sinceHours}h — nothing to post.`,
+        sinceHours,
+        generated: 0,
+      });
+    }
+
+    const results: any[] = [];
+
+    for (const productKey of productKeys) {
+      const company = PRODUCT_TO_COMPANY[productKey.toLowerCase()];
+      if (!company || !COMPANY_KB[company]) {
+        results.push({
+          product: productKey,
+          success: false,
+          skipped: true,
+          reason: `No company mapping or KB entry for "${productKey}" — add to PRODUCT_TO_COMPANY + companyKB.ts`,
+        });
+        continue;
+      }
+
+      const activities = productsActivity[productKey];
+      const prompt = buildDigestPrompt(company, activities, sinceHours);
+
+      if (dryRun) {
+        results.push({
+          product: productKey,
+          company,
+          activityCount: activities.length,
+          dryRun: true,
+          promptPreview: prompt.slice(0, 300) + '...',
+        });
+        continue;
+      }
+
+      try {
+        const generated = await generateBlogContent(prompt, company, 'dashboard-digest');
+        const slug = generateSlug(generated.title);
+
+        const blog = await prisma.blog.create({
+          data: {
+            title: generated.title,
+            slug,
+            content: generated.content,
+            excerpt: generated.excerpt,
+            company,
+            category: 'dashboard-digest',
+            tags: [...generated.tags, 'whats-new', 'product-update'],
+            status: BlogStatus.GENERATED,
+            prompt,
+            model: 'gemini-2.5-flash',
+          },
+        });
+
+        let published = false;
+        let publishError: string | null = null;
+
+        if (autoPublish) {
+          const targetUrl = getProductBlogUrl(company);
+          const apiKeyForProduct = getProductApiKey(company);
+
+          if (!targetUrl || !apiKeyForProduct) {
+            publishError = `No publish endpoint configured for ${company}`;
+          } else {
+            try {
+              const pubResp = await fetch(targetUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-API-Key': apiKeyForProduct,
+                },
+                body: JSON.stringify({
+                  title: blog.title,
+                  slug: blog.slug,
+                  content: blog.content,
+                  excerpt: blog.excerpt,
+                  category: blog.category,
+                  tags: blog.tags,
+                }),
+              });
+              if (!pubResp.ok) {
+                publishError = `Publish failed (${pubResp.status}): ${(await pubResp.text()).slice(0, 200)}`;
+              } else {
+                published = true;
+                await prisma.blog.update({
+                  where: { id: blog.id },
+                  data: {
+                    status: BlogStatus.PUBLISHED,
+                    publishedAt: new Date(),
+                    pushedAt: new Date(),
+                    pushError: null,
+                  },
+                });
+              }
+            } catch (e: any) {
+              publishError = e.message;
+            }
+          }
+
+          if (publishError) {
+            await prisma.blog.update({
+              where: { id: blog.id },
+              data: { status: BlogStatus.FAILED, pushError: publishError },
+            });
+          }
+        }
+
+        results.push({
+          product: productKey,
+          company,
+          activityCount: activities.length,
+          blogId: blog.id,
+          title: blog.title,
+          published,
+          publishError,
+          success: true,
+        });
+      } catch (err: any) {
+        results.push({
+          product: productKey,
+          company,
+          success: false,
+          error: err.message,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      sinceHours,
+      productsWithActivity: productKeys.length,
+      generated: results.filter((r) => r.success).length,
+      published: results.filter((r) => r.published).length,
+      failed: results.filter((r) => r.success === false).length,
+      results,
+    });
+  } catch (error: any) {
+    console.error('generate-from-dashboard error:', error);
     res.status(500).json({ error: error.message });
   }
 });
