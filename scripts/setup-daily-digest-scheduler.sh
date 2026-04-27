@@ -19,27 +19,23 @@
 #   ./setup-daily-digest-scheduler.sh
 #
 # Requires: gcloud authenticated with an identity that has BOTH
-#   - roles/secretmanager.secretAccessor on the OMEVISION_JOB_SECRET secret
-#   - roles/cloudscheduler.admin on omevision-utils
+#   - roles/secretmanager.secretAccessor on AUTOBLOGGER__OMEVISION_JOB_SECRET
+#   - roles/cloudscheduler.admin on hiyebo
 #
-# The default deploy SA (deployer@hiyebo.iam.gserviceaccount.com) does NOT
-# yet have these roles on omevision-utils — that project lives on the
-# eneza.app org, not hiyebo.com. Recommended: run as your owner identity, or
-# grant the deploy SA the two roles above on omevision-utils first:
+# The deploy SA (deployer@hiyebo.iam.gserviceaccount.com) has these roles
+# at the org level by default — just activate that gcloud configuration:
 #
-#   gcloud projects add-iam-policy-binding omevision-utils \
-#     --member=serviceAccount:deployer@hiyebo.iam.gserviceaccount.com \
-#     --role=roles/secretmanager.secretAccessor
-#   gcloud projects add-iam-policy-binding omevision-utils \
-#     --member=serviceAccount:deployer@hiyebo.iam.gserviceaccount.com \
-#     --role=roles/cloudscheduler.admin
+#   gcloud config configurations activate deployer
+#   gcloud config set project hiyebo
+#   ./setup-daily-digest-scheduler.sh
 
 set -euo pipefail
 
-PROJECT=${PROJECT:-omevision-utils}
+PROJECT=${PROJECT:-hiyebo}
 REGION=${REGION:-europe-west1}
 JOB_NAME=${JOB_NAME:-autoblogger-daily-digest}
-AUTOBLOGGER_URL=${AUTOBLOGGER_URL:-https://autoblogger-1026777738823.europe-west1.run.app}
+# Live autoblogger Cloud Run service in hiyebo.
+AUTOBLOGGER_URL=${AUTOBLOGGER_URL:-https://autoblogger-api-prod-438855261609.europe-west1.run.app}
 ENDPOINT="${AUTOBLOGGER_URL}/api/blogs/generate-from-dashboard"
 
 # 09:00 SAST = 07:00 UTC. We could also use --time-zone=Africa/Mbabane and
@@ -50,9 +46,10 @@ SCHEDULE='0 7 * * *'
 TIME_ZONE='Etc/UTC'
 
 # Pull the job secret from Secret Manager (same secret the autoblogger uses).
+# Hiyebo naming convention: AUTOBLOGGER__<NAME>.
 echo "→ Fetching job secret from Secret Manager…"
 JOB_SECRET=$(gcloud secrets versions access latest \
-  --secret=OMEVISION_JOB_SECRET \
+  --secret=AUTOBLOGGER__OMEVISION_JOB_SECRET \
   --project="$PROJECT")
 
 if [[ -z "$JOB_SECRET" ]]; then

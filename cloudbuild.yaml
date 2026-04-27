@@ -1,0 +1,72 @@
+# Cloud Build pipeline for the autoblogger.
+#
+# Triggered by Cloud Build trigger `autoblogger-api-prod` on the hiyebo
+# project, firing on push to `main` of github.com/omegathesecond/autoblogger.
+# Mirrors the pattern used by every other Omevision service on hiyebo
+# (see e.g. corporate/ceo-dashboard-api/cloudbuild.yaml).
+#
+# What it does:
+#   1. Build the Docker image, tagging with both commit-sha and `latest`.
+#   2. Push both tags to gcr.io/$PROJECT_ID/.
+#   3. `gcloud run deploy` with --image only.
+#
+# Env vars and secrets are NOT set here — they're configured out-of-band on
+# the live Cloud Run service via `gcloud run services update`. When this
+# build deploys with --image only, Cloud Run preserves the env config from
+# the previous revision. To add a new env var or secret, run:
+#
+#   gcloud run services update autoblogger-api-prod \
+#     --region=europe-west1 --project=hiyebo \
+#     --update-env-vars=KEY=value
+#
+#   gcloud run services update autoblogger-api-prod \
+#     --region=europe-west1 --project=hiyebo \
+#     --update-secrets=KEY=secret-name:latest
+#
+# Required env vars / secrets (one-time setup):
+#   - DATABASE_URL                  (secret: AUTOBLOGGER__DB_URL)
+#   - GEMINI_API_KEY                (secret: AUTOBLOGGER__GEMINI_API_KEY)
+#   - INTERNAL_API_KEY              (secret: AUTOBLOGGER__OMEVISION_INTERNAL_KEY)
+#   - JOB_SECRET                    (secret: AUTOBLOGGER__OMEVISION_JOB_SECRET)
+#   - {ENEZA,VAVU,BAMZU,YEBONA,YEBOJOBS,YEBOLINK,YEBOMART}_BLOG_URL (env)
+#   - {ENEZA,VAVU,BAMZU,YEBONA,YEBOJOBS,YEBOLINK,YEBOMART,YEBOLEARN}_BLOG_API_KEY (secrets)
+#   - CEO_DASHBOARD_API_URL         (env, set to dashboard Cloud Run URL)
+#   - CEO_DASHBOARD_INTERNAL_KEY    (secret: AUTOBLOGGER__CEO_DASHBOARD_INTERNAL_KEY,
+#                                    must match the dashboard's INTERNAL_API_KEY)
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/autoblogger-api-prod:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/autoblogger-api-prod:latest'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/autoblogger-api-prod:$COMMIT_SHA']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/autoblogger-api-prod:latest']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'autoblogger-api-prod'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/autoblogger-api-prod:$COMMIT_SHA'
+      - '--region'
+      - 'europe-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+images:
+  - 'gcr.io/$PROJECT_ID/autoblogger-api-prod:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/autoblogger-api-prod:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

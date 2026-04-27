@@ -1,44 +1,27 @@
-name: Deploy to Cloud Run
+# Deploys are now driven by Cloud Build on the hiyebo project
+# (trigger: `autoblogger-api-prod`, runs `cloudbuild.yaml` on push to main).
+# This GitHub Actions workflow is intentionally a no-op so it doesn't fight
+# with Cloud Build or try to deploy to the legacy omevision-utils project.
+#
+# To verify the active deploy path:
+#   gcloud builds triggers describe autoblogger-api-prod --project=hiyebo
+#
+# History: this file used to deploy a separate Cloud Run service called
+# `autoblogger` in `omevision-utils`. That deploy target is deprecated;
+# the canonical service is `autoblogger-api-prod` in `hiyebo`. See
+# project_gcp_project_layout_apr23 in MEMORY.md.
+
+name: noop (deploys handled by Cloud Build on hiyebo)
 
 on:
-  push:
-    branches: [main, master]
-
-env:
-  PROJECT_ID: omevision-utils
-  REGION: europe-west1
-  SERVICE: autoblogger
-  IMAGE: gcr.io/omevision-utils/autoblogger
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  noop:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Setup gcloud
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Build & push Docker image
+      - name: Document active deploy path
         run: |
-          gcloud auth configure-docker gcr.io --quiet
-          docker build -t $IMAGE:${{ github.sha }} -t $IMAGE:latest .
-          docker push $IMAGE:${{ github.sha }}
-          docker push $IMAGE:latest
-
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy $SERVICE \
-            --image $IMAGE:${{ github.sha }} \
-            --region $REGION \
-            --platform managed \
-            --allow-unauthenticated \
-            --project $PROJECT_ID \
-            --update-secrets="DATABASE_URL=AUTOBLOGGER_DB_URL:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,INTERNAL_API_KEY=OMEVISION_INTERNAL_KEY:latest,JOB_SECRET=OMEVISION_JOB_SECRET:latest,CEO_DASHBOARD_INTERNAL_KEY=ceo-dashboard-internal-key:latest" \
-            --update-env-vars="NODE_ENV=production,ENEZA_BLOG_API_KEY=UmWIw5ajH7/MgRNKczZFDZ2T7wIPSAyQJVx7YAqWf8k=,VAVU_BLOG_URL=https://vavu-api-41980725786.europe-west1.run.app/api/blog/posts,BAMZU_BLOG_URL=https://bamzu-api-25158090642.europe-west1.run.app/api/blog/posts,YEBONA_BLOG_URL=https://yebona-api-402346709223.europe-west1.run.app/api/blog/posts,YEBOJOBS_BLOG_URL=https://yebojobs-api-376380527123.europe-west1.run.app/api/blog/posts,YEBOLINK_BLOG_URL=https://yebolink-api-487987213774.europe-west1.run.app/api/blog/posts,ENEZA_BLOG_URL=https://eneza-api-prod-1026777738823.europe-west1.run.app/api/blog/posts,CEO_DASHBOARD_API_URL=https://ceo-dashboard-api-238692725328.europe-west1.run.app"
+          echo "Deploys for this repo run on Cloud Build (hiyebo project)."
+          echo "Trigger: autoblogger-api-prod (push to main → cloudbuild.yaml)"
+          echo "This workflow exists only to document that fact."

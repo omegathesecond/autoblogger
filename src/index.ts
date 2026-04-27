@@ -544,9 +544,11 @@ Requirements:
 // for backfill / debugging via the same endpoint.
 // ──────────────────────────────────────────────────────────────────────────────
 
+// Hiyebo project Cloud Run URL. The legacy omevision-utils URL is
+// (intentionally) NOT a fallback — pointing at it would just hit a 404.
 const CEO_DASHBOARD_API_URL =
   process.env.CEO_DASHBOARD_API_URL ||
-  'https://ceo-dashboard-api-238692725328.europe-west1.run.app';
+  'https://ceo-dashboard-api-438855261609.europe-west1.run.app';
 
 // Map dashboard product names → autoblogger company keys. Most are the same,
 // but the rebrand aliases (yebocars=bamzu, yeboshops=vavu) need translation
