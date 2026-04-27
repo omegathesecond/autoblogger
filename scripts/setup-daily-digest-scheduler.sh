@@ -18,7 +18,21 @@
 # Usage:
 #   ./setup-daily-digest-scheduler.sh
 #
-# Requires: gcloud configured with deploy SA active, project = omevision-utils.
+# Requires: gcloud authenticated with an identity that has BOTH
+#   - roles/secretmanager.secretAccessor on the OMEVISION_JOB_SECRET secret
+#   - roles/cloudscheduler.admin on omevision-utils
+#
+# The default deploy SA (deployer@hiyebo.iam.gserviceaccount.com) does NOT
+# yet have these roles on omevision-utils — that project lives on the
+# eneza.app org, not hiyebo.com. Recommended: run as your owner identity, or
+# grant the deploy SA the two roles above on omevision-utils first:
+#
+#   gcloud projects add-iam-policy-binding omevision-utils \
+#     --member=serviceAccount:deployer@hiyebo.iam.gserviceaccount.com \
+#     --role=roles/secretmanager.secretAccessor
+#   gcloud projects add-iam-policy-binding omevision-utils \
+#     --member=serviceAccount:deployer@hiyebo.iam.gserviceaccount.com \
+#     --role=roles/cloudscheduler.admin
 
 set -euo pipefail
 
