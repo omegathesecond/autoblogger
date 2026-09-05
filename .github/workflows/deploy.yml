@@ -3,7 +3,19 @@
 # This GitHub Actions workflow is intentionally a no-op so it doesn't fight
 # with Cloud Build or try to deploy to the legacy omevision-utils project.
 #
-# To verify the active deploy path:
+# Verified 2026-09-05 (gcloud builds triggers describe autoblogger-api-prod
+# --project=hiyebo): trigger id 72e043a1-833d-463f-9ab2-88df77631d9f exists,
+# watches omegathesecond/autoblogger on push to ^main$, runs cloudbuild.yaml,
+# deploys as autoblogger-runtime@hiyebo.iam.gserviceaccount.com. (It had
+# briefly gone missing/NOT_FOUND before this date; it has been recreated.)
+#
+# `autoblogger-api-dev` (the other live Cloud Run service in hiyebo) has NO
+# Cloud Build trigger and no cloudbuild-dev.yaml in this repo — it is not
+# part of this repo's CI and must be deployed manually via
+# `gcloud run deploy autoblogger-api-dev --region=europe-west1
+# --project=hiyebo ...` if it needs updating.
+#
+# To re-verify the active deploy path:
 #   gcloud builds triggers describe autoblogger-api-prod --project=hiyebo
 #
 # History: this file used to deploy a separate Cloud Run service called
