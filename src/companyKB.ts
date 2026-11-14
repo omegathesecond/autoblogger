@@ -70,12 +70,12 @@ export const COMPANY_KB: Record<string, CompanyInfo> = {
     ctaUrl: 'https://yebolink.com',
   },
 
-  vavu: {
-    name: 'Vavu',
+  yeboshops: {
+    name: 'YeboShops',
     tagline: 'Africa\'s AI-Powered Classifieds Marketplace',
-    description: 'Vavu is an AI-powered classifieds marketplace built for Africa. Sellers can list anything from electronics and furniture to vehicles and services. Vavu uses AI to analyze product listings, suggest optimal prices, and match buyers with sellers across the continent.',
-    website: 'https://vavu.app',
-    blogUrl: 'https://blog.vavu.app',
+    description: 'YeboShops is an AI-powered classifieds marketplace built for Africa. Sellers can list anything from electronics and furniture to vehicles and services. YeboShops uses AI to analyze product listings, suggest optimal prices, and match buyers with sellers across the continent.',
+    website: 'https://yeboshops.com',
+    blogUrl: 'https://blog.yeboshops.com',
     primaryColor: '#f97316',
     emoji: '🛒',
     founded: '2024',
@@ -89,8 +89,8 @@ export const COMPANY_KB: Record<string, CompanyInfo> = {
       'Location-based search',
     ],
     targetAudience: 'Buyers and sellers across Africa looking for a trustworthy, modern classifieds platform',
-    ctaText: 'Buy and sell on Vavu',
-    ctaUrl: 'https://vavu.app',
+    ctaText: 'Buy and sell on YeboShops',
+    ctaUrl: 'https://yeboshops.com',
   },
 
   bamzu: {
