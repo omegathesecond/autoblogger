@@ -4,16 +4,20 @@
   "description": "AI-powered blog generator for Omevision products",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "node node_modules/@omevision/release-guard/cli.mjs --phase source && tsc && node node_modules/@omevision/release-guard/cli.mjs --phase artifacts --path dist",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "ts-node src/index.ts",
+    "postbuild": "node node_modules/@omevision/release-guard/cli.mjs --phase artifacts --path dist",
+    "release:check": "node node_modules/@omevision/release-guard/cli.mjs --phase source",
+    "release:test": "node node_modules/@omevision/release-guard/test/guard.test.mjs && node node_modules/@omevision/release-guard/test/release-wiring.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "@prisma/client": "^6.3.0",
     "express": "^4.21.2",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7"
+    "dotenv": "^16.4.7",
+    "@omevision/release-guard": "file:vendor/omevision-release-guard-1.0.0.tgz"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

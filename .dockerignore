@@ -1,0 +1,23 @@
+.git
+node_modules
+dist
+.env*
+*.log
+
+.release-tools
+
+# Keep the declared release inputs available to the in-image source check.
+!.github
+!.github/**
+!Dockerfile
+!cloudbuild.yaml
+!package-lock.json
+!package.json
+!prisma
+!prisma/**
+!scripts
+!scripts/**
+!src
+!src/**
+!tsconfig.json
+!.env.example
