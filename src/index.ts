@@ -39,7 +39,7 @@ const SEO_MATRIX: Record<string, { keywords: string[], countries: string[] }> = 
     ],
     countries: ['Kenya', 'Eswatini', 'South Africa', 'Nigeria', 'Tanzania', 'Uganda', 'Ghana', 'Rwanda', 'Ethiopia', 'Zambia']
   },
-  vavu: {
+  yeboshops: {
     keywords: [
       'online shopping sites', 'buy and sell online', 'classifieds marketplace',
       'second hand items', 'online marketplace', 'sell stuff online', 'buy used items',
@@ -551,9 +551,7 @@ const CEO_DASHBOARD_API_URL =
   'https://ceo-dashboard-api-438855261609.europe-west1.run.app';
 
 // Map dashboard product names → autoblogger company keys. Most are the same,
-// but the rebrand aliases (yebocars=bamzu, yeboshops=vavu) need translation
-// because the autoblogger's company knowledge base + publish endpoints still
-// use the legacy keys.
+// while YeboCars uses the existing bamzu publishing key.
 const PRODUCT_TO_COMPANY: Record<string, string> = {
   eneza: 'eneza',
   yebojobs: 'yebojobs',
@@ -563,8 +561,7 @@ const PRODUCT_TO_COMPANY: Record<string, string> = {
   yebona: 'yebona',
   yebocars: 'bamzu',   // rebrand: Bamzu → yebocars
   bamzu: 'bamzu',
-  yeboshops: 'vavu',   // rebrand: Vavu → yeboshops
-  vavu: 'vavu',
+  yeboshops: 'yeboshops',
 };
 
 interface DashboardActivity {
@@ -997,7 +994,7 @@ function getProductBlogUrl(company: string): string | null {
   const urls: Record<string, string> = {
     eneza: process.env.ENEZA_BLOG_URL || 'https://eneza-api-prod-1026777738823.europe-west1.run.app/api/blog/posts',
     yebojobs: process.env.YEBOJOBS_BLOG_URL || 'https://yebojobs-api-376380527123.europe-west1.run.app/api/blog/posts',
-    vavu: process.env.VAVU_BLOG_URL || 'https://vavu-api-41980725786.europe-west1.run.app/api/blog/posts',
+    yeboshops: process.env.YEBOSHOPS_BLOG_URL || 'https://api.yeboshops.com/api/blog/posts',
     bamzu: process.env.BAMZU_BLOG_URL || 'https://bamzu-api-25158090642.europe-west1.run.app/api/blog/posts',
     yebona: process.env.YEBONA_BLOG_URL || 'https://yebona-api-402346709223.europe-west1.run.app/api/blog/posts',
     yebolink: process.env.YEBOLINK_BLOG_URL || 'https://yebolink-api-487987213774.europe-west1.run.app/api/blog/posts',
@@ -1012,7 +1009,7 @@ function getProductApiKey(company: string): string | null {
   const keys: Record<string, string | undefined> = {
     eneza: process.env.ENEZA_BLOG_API_KEY,
     yebojobs: process.env.YEBOJOBS_BLOG_API_KEY,
-    vavu: process.env.VAVU_BLOG_API_KEY,
+    yeboshops: process.env.YEBOSHOPS_BLOG_API_KEY,
     yebona: process.env.YEBONA_BLOG_API_KEY,
     bamzu: process.env.BAMZU_BLOG_API_KEY,
     yebolink: process.env.YEBOLINK_BLOG_API_KEY,
