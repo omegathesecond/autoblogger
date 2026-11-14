@@ -35,6 +35,16 @@
 #                                    must match the dashboard's INTERNAL_API_KEY)
 
 steps:
+  - name: node:22-alpine
+    id: retired-domain-source-guard
+    automapSubstitutions: true
+    entrypoint: sh
+    args:
+      - -ec
+      - |
+        mkdir -p .release-tools
+        tar -xzf vendor/omevision-release-guard-1.0.0.tgz -C .release-tools
+        node .release-tools/package/cli.mjs --phase source
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
@@ -44,6 +54,22 @@ steps:
       - 'gcr.io/$PROJECT_ID/autoblogger-api-prod:latest'
       - '.'
 
+  - name: gcr.io/cloud-builders/docker
+    id: retired-domain-container-guard
+    entrypoint: sh
+    args:
+      - -ec
+      - |
+        docker run --rm gcr.io/$PROJECT_ID/autoblogger-api-prod:$COMMIT_SHA node -e 'console.log("RELEASE_GUARD_RUNTIME_OK")'
+        if docker run --rm -e RELEASE_GUARD_PROBE_URL="https://$$(printf '%s.%s' vavu app)" gcr.io/$PROJECT_ID/autoblogger-api-prod:$COMMIT_SHA node -e 'console.log("RELEASE_GUARD_COMMAND_EXECUTED")' > .release-tools/runtime-negative.log 2>&1; then
+          echo "Release guard accepted a retired runtime binding" >&2
+          exit 1
+        fi
+        grep -q 'ReleaseGuardError: Retired domain' .release-tools/runtime-negative.log
+        if grep -q 'RELEASE_GUARD_COMMAND_EXECUTED' .release-tools/runtime-negative.log; then
+          echo "Runtime command executed before release validation" >&2
+          exit 1
+        fi
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/autoblogger-api-prod:$COMMIT_SHA']
 

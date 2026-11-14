@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "sources": [
+    ".env.example",
+    ".github",
+    "Dockerfile",
+    "cloudbuild.yaml",
+    "package-lock.json",
+    "package.json",
+    "prisma",
+    "scripts",
+    "src",
+    "tsconfig.json"
+  ],
+  "artifacts": [
+    "dist"
+  ],
+  "buildOutputs": {
+    "build": "dist"
+  },
+  "deployOutputs": {}
+}
