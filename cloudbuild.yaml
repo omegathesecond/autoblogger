@@ -90,6 +90,12 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
 
+  # A previous no-traffic verification must not pin future successful releases.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: serve-guarded-revision
+    entrypoint: gcloud
+    args: ['run', 'services', 'update-traffic', 'autoblogger-api-prod', '--to-latest', '--region=europe-west1', '--project=$PROJECT_ID', '--quiet']
+
 images:
   - 'gcr.io/$PROJECT_ID/autoblogger-api-prod:$COMMIT_SHA'
   - 'gcr.io/$PROJECT_ID/autoblogger-api-prod:latest'
