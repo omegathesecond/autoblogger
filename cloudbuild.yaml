@@ -82,6 +82,8 @@ steps:
       - 'run'
       - 'deploy'
       - 'autoblogger-api-prod'
+      - '--revision-suffix=ci-$BUILD_ID'
+      - '--no-traffic'
       - '--image'
       - 'gcr.io/$PROJECT_ID/autoblogger-api-prod:$COMMIT_SHA'
       - '--region'
@@ -89,6 +91,12 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
+
+  # Promote only this build's ready revision; never a concurrent verification revision.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: serve-guarded-revision
+    entrypoint: gcloud
+    args: ['run', 'services', 'update-traffic', 'autoblogger-api-prod', '--to-revisions=autoblogger-api-prod-ci-$BUILD_ID=100', '--region=europe-west1', '--project=$PROJECT_ID', '--quiet']
 
 images:
   - 'gcr.io/$PROJECT_ID/autoblogger-api-prod:$COMMIT_SHA'
